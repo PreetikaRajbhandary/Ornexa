@@ -1,0 +1,235 @@
+package com.Ornexa.dao;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.Ornexa.model.Product;
+import com.Ornexa.utils.DBconfig;
+
+public class ProductDao {
+	
+		public List<Product> getAllProducts() throws Exception {
+
+	        Connection conn = DBconfig.getConnection();
+
+	        String sql = "SELECT product_id, product_name, product_price, stock_quantity, " +
+	                     "material, gender, product_description, img_url, category_id " +
+	                     "FROM product ORDER BY product_id DESC";
+
+	        PreparedStatement ps = conn.prepareStatement(sql);
+	        ResultSet rs = ps.executeQuery();
+
+	        List<Product> productList = new ArrayList<>();
+
+	        while (rs.next()) {
+
+	            Product p = new Product();
+
+	            p.setId(rs.getInt("product_id"));
+	            p.setName(rs.getString("product_name"));
+	            p.setPrice(rs.getDouble("product_price"));
+	            p.setStockQuantity(rs.getInt("stock_quantity"));
+	            p.setMaterial(rs.getString("material"));
+	            p.setGender(rs.getString("gender"));
+	            p.setDescription(rs.getString("product_description"));
+	            p.setImgUrl(rs.getString("img_url"));
+	            p.setCategoryId(rs.getInt("category_id"));
+
+	            productList.add(p);
+	        }
+
+	        rs.close();
+	        ps.close();
+	        conn.close();
+
+	        return productList;
+	    }
+		public List<Product> getFilteredProducts(String material, String style, String gender) throws Exception {
+
+		    Connection conn = DBconfig.getConnection();
+
+		    String sql = "SELECT product_id, product_name, product_price, stock_quantity, " +
+		                 "material, gender, style, product_description, img_url, category_id " +
+		                 "FROM product WHERE 1=1 ";
+
+		    if (material != null && !material.isEmpty()) {
+		        sql += " AND material = ?";
+		    }
+
+		    if (gender != null && !gender.isEmpty()) {
+		        sql += " AND gender = ?";
+		    }
+
+		    if (style != null && !style.isEmpty()) {
+		        sql += " AND style = ?";
+		    }
+
+		    sql += " ORDER BY product_id DESC";
+
+		    PreparedStatement ps = conn.prepareStatement(sql);
+
+		    int i = 1;
+
+		    if (material != null && !material.isEmpty()) {
+		        ps.setString(i++, material);
+		    }
+
+		    if (gender != null && !gender.isEmpty()) {
+		        ps.setString(i++, gender);
+		    }
+
+		    if (style != null && !style.isEmpty()) {
+		        ps.setString(i++, style);
+		    }
+
+		    ResultSet rs = ps.executeQuery();
+
+		    List<Product> products = new ArrayList<>();
+
+		    while (rs.next()) {
+
+		        Product prod = new Product();
+
+		        prod.setId(rs.getInt("product_id"));
+		        prod.setName(rs.getString("product_name"));
+		        prod.setPrice(rs.getDouble("product_price"));
+		        prod.setStockQuantity(rs.getInt("stock_quantity"));
+		        prod.setMaterial(rs.getString("material"));
+		        prod.setGender(rs.getString("gender"));
+		        prod.setStyle(rs.getString("style"));
+		        prod.setDescription(rs.getString("product_description"));
+		        prod.setImgUrl(rs.getString("img_url"));
+		        prod.setCategoryId(rs.getInt("category_id"));
+
+		        products.add(prod);
+		    }
+
+		    rs.close();
+		    ps.close();
+		    conn.close();
+
+		    return products;
+		}
+		public Product getProductById(int id) throws Exception {
+
+		    Connection conn = DBconfig.getConnection();
+
+		    String sql = "SELECT * FROM product WHERE product_id = ?";
+
+		    PreparedStatement ps = conn.prepareStatement(sql);
+		    ps.setInt(1, id);
+
+		    ResultSet rs = ps.executeQuery();
+
+		    if (rs.next()) {
+
+		        Product p = new Product();
+
+		        p.setId(rs.getInt("product_id"));
+		        p.setName(rs.getString("product_name"));
+		        p.setPrice(rs.getDouble("product_price"));
+		        p.setStockQuantity(rs.getInt("stock_quantity"));
+		        p.setMaterial(rs.getString("material"));
+		        p.setGender(rs.getString("gender"));
+		        p.setDescription(rs.getString("product_description"));
+		        p.setImgUrl(rs.getString("img_url"));
+		        p.setCategoryId(rs.getInt("category_id"));
+		        p.setStyle(rs.getString("style"));
+
+		        return p;
+		    }
+
+		    return null;
+		}
+		public List<Product> getCollectionProducts() throws Exception {
+
+	        Connection conn = DBconfig.getConnection();
+
+	        String sql = "SELECT product_id, product_name, product_price, " +
+	                "product_description, img_url " +
+	                "FROM (SELECT * FROM product " +
+	                "ORDER BY product_id DESC LIMIT 5) AS latest_products " +
+	                "ORDER BY product_id ASC";
+	        		
+	        PreparedStatement ps = conn.prepareStatement(sql);
+
+	        ResultSet rs = ps.executeQuery();
+
+	        List<Product> collectionProducts = new ArrayList<>();
+
+	        while (rs.next()) {
+
+	            Product p = new Product();
+
+	            p.setId(rs.getInt("product_id"));
+	            p.setName(rs.getString("product_name"));
+	            p.setPrice(rs.getDouble("product_price"));
+	            p.setDescription(rs.getString("product_description"));
+	            p.setImgUrl(rs.getString("img_url"));
+
+	            collectionProducts.add(p);
+	        }
+
+	        rs.close();
+	        ps.close();
+	        conn.close();
+
+	        return collectionProducts;
+	    }
+		public boolean insertProduct(Product p) throws Exception {
+
+		    Connection conn = DBconfig.getConnection();
+
+		    String sql = "INSERT INTO product (pname, price, image) VALUES (?, ?, ?)";
+
+		    PreparedStatement ps = conn.prepareStatement(sql);
+
+		    ps.setString(1, p.getName());
+		    ps.setDouble(2, p.getPrice());
+		    ps.setString(3, p.getImgUrl());
+
+		    int rows = ps.executeUpdate();
+
+		    return rows > 0;
+		}
+		public List<Product> searchProducts(String query) {
+		    List<Product> products = new ArrayList<>();
+		    // Using LIKE with % allows for partial matches 
+		    String sql = "SELECT * FROM product WHERE product_name LIKE ? OR product_description LIKE ? OR material LIKE ?";
+		    try (Connection conn = DBconfig.getConnection();
+		         PreparedStatement ps = conn.prepareStatement(sql)) {
+		        
+		        String searchPattern = "%" + query + "%";
+		        ps.setString(1, searchPattern);
+		        ps.setString(2, searchPattern);
+		        ps.setString(3, searchPattern);
+
+		        ResultSet rs = ps.executeQuery();
+		        while (rs.next()) {
+		            Product p = new Product();
+
+			        p.setId(rs.getInt("product_id"));
+			        p.setName(rs.getString("product_name"));
+			        p.setPrice(rs.getDouble("product_price"));
+			        p.setStockQuantity(rs.getInt("stock_quantity"));
+			        p.setMaterial(rs.getString("material"));
+			        p.setGender(rs.getString("gender"));
+			        p.setDescription(rs.getString("product_description"));
+			        p.setImgUrl(rs.getString("img_url"));
+			        p.setCategoryId(rs.getInt("category_id"));
+			        p.setStyle(rs.getString("style"));
+
+		            products.add(p);
+		        }
+		    } catch (SQLException e) {
+		        e.printStackTrace();
+		    }
+		    return products;
+		}
+
+
+}

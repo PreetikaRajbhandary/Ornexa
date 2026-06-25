@@ -1,0 +1,289 @@
+package com.Ornexa.dao;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.Ornexa.model.Order;
+import com.Ornexa.model.OrderItem;
+import com.Ornexa.utils.DBconfig;
+
+public class OrderDao {
+
+	// get all orders
+    public List<Order> getAllOrders() {
+
+        List<Order> list = new ArrayList<>();
+
+        String sql = "SELECT o.*, u.userName, u.email " +
+                     "FROM order_table o " +
+                     "JOIN users u ON o.user_id = u.user_id " +
+                     "ORDER BY o.Order_Id DESC";
+
+        try (Connection con = DBconfig.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            while (rs.next()) {
+
+                Order o = new Order();
+
+                o.setOrderId(rs.getInt("Order_Id"));
+                o.setOrderDate(rs.getString("Order_Date"));
+                o.setDestination(rs.getString("Destination"));
+
+                double amount = rs.getDouble("Total_Amount");
+                if (rs.wasNull()) amount = 0;
+
+                o.setTotalAmount(amount);
+                o.setOrderStatus(rs.getString("Order_Status"));
+
+                o.setUserName(rs.getString("userName"));
+                o.setEmail(rs.getString("email"));
+
+                list.add(o);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return list;
+    }
+
+    // update order status (pending, cancelled, transit, delivered)
+    public boolean updateOrderStatus(int orderId, String status) {
+
+        String sql = "UPDATE order_table SET Order_Status=? WHERE Order_Id=?";
+
+        try (Connection con = DBconfig.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setString(1, status);
+            ps.setInt(2, orderId);
+
+            return ps.executeUpdate() > 0;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return false;
+    }
+
+    //filtering data 
+    
+    public List<Order> getFilteredOrders(String status, String fromDate, String toDate) {
+
+        List<Order> list = new ArrayList<>();
+
+        String sql = "SELECT o.*, u.userName, u.email " +
+                     "FROM order_table o " +
+                     "JOIN users u ON o.user_id = u.user_id " +
+                     "WHERE 1=1";
+
+        if (status != null && !status.isEmpty()) {
+            sql += " AND o.Order_Status = ?";
+        }
+
+        if (fromDate != null && !fromDate.isEmpty()) {
+            sql += " AND DATE(o.Order_Date) >= ?";
+        }
+
+        if (toDate != null && !toDate.isEmpty()) {
+            sql += " AND DATE(o.Order_Date) <= ?";
+        }
+
+        sql += " ORDER BY o.Order_Id DESC";
+
+        try (Connection con = DBconfig.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            int i = 1;
+
+            if (status != null && !status.isEmpty()) {
+                ps.setString(i++, status);
+            }
+
+            if (fromDate != null && !fromDate.isEmpty()) {
+                ps.setString(i++, fromDate);
+            }
+
+            if (toDate != null && !toDate.isEmpty()) {
+                ps.setString(i++, toDate);
+            }
+
+            ResultSet rs = ps.executeQuery();
+
+            while (rs.next()) {
+
+                Order o = new Order();
+
+                o.setOrderId(rs.getInt("Order_Id"));
+                o.setOrderDate(rs.getString("Order_Date"));
+                o.setDestination(rs.getString("Destination"));
+                o.setTotalAmount(rs.getDouble("Total_Amount"));
+                o.setOrderStatus(rs.getString("Order_Status"));
+
+                o.setUserName(rs.getString("userName"));
+                o.setEmail(rs.getString("email"));
+
+                list.add(o);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return list;
+    }
+
+    // total revenue/sales
+    public double getTotalRevenue() {
+
+        double total = 0;
+
+        String sql = "SELECT SUM(Total_Amount) FROM order_table WHERE Order_Status='DELIVERED'";
+
+        try (Connection con = DBconfig.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            if (rs.next()) {
+                total = rs.getDouble(1);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return total;
+    }
+
+    // monthly revenue 
+    public double getMonthlyRevenue(int monthOffset) {
+
+        double total = 0;
+
+        String sql = "SELECT SUM(Total_Amount) FROM order_table " +
+                     "WHERE MONTH(Order_Date) = MONTH(CURDATE() - INTERVAL ? MONTH) " +
+                     "AND Order_Status='DELIVERED'";
+
+        try (Connection con = DBconfig.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, monthOffset);
+
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                total = rs.getDouble(1);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return total;
+    }
+
+    // get particular order by id
+    public List<OrderItem> getItemsByOrderId(int orderId) {
+
+        List<OrderItem> list = new ArrayList<>();
+
+        String sql = "SELECT oi.*, p.Product_Name " +
+                     "FROM orderitem oi " +
+                     "JOIN product p ON oi.Product_Id = p.Product_Id " +
+                     "WHERE oi.Order_Id = ?";
+
+        try (Connection con = DBconfig.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, orderId);
+            ResultSet rs = ps.executeQuery();
+
+            while (rs.next()) {
+
+                OrderItem item = new OrderItem();
+
+                item.setOrderId(rs.getInt("Order_Id"));
+                item.setProductId(rs.getInt("Product_Id"));
+                item.setQuantity(rs.getInt("Quantity"));
+                item.setPrice(rs.getDouble("Price"));
+                item.setProductName(rs.getString("Product_Name"));
+
+                list.add(item);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return list;
+    }
+
+    // single order for invoice
+    public Order getSingleOrder(int orderId) {
+
+        String sql = "SELECT o.*, u.userName, u.email " +
+                     "FROM order_table o " +
+                     "JOIN users u ON o.user_id = u.user_id " +
+                     "WHERE o.Order_Id = ?";
+
+        try (Connection con = DBconfig.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, orderId);
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+
+                Order o = new Order();
+
+                o.setOrderId(rs.getInt("Order_Id"));
+                o.setOrderDate(rs.getString("Order_Date"));
+                o.setDestination(rs.getString("Destination"));
+                o.setTotalAmount(rs.getDouble("Total_Amount"));
+                o.setOrderStatus(rs.getString("Order_Status"));
+
+                o.setUserName(rs.getString("userName"));
+                o.setEmail(rs.getString("email"));
+
+                return o;
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+    public List<Order> getOrdersByUserId(int userId) {
+		List<Order> list = new ArrayList<>();
+		String sql = "SELECT Order_Id, Order_Date, Total_Amount, Order_Status " +
+				"FROM order_table " +
+				"WHERE user_id = ? " +
+				"ORDER BY Order_Date DESC";
+
+		try (Connection con = DBconfig.getConnection();
+			 PreparedStatement ps = con.prepareStatement(sql)) {
+
+			ps.setInt(1, userId);
+			ResultSet rs = ps.executeQuery();
+
+			while (rs.next()) {
+				Order o = new Order();
+				o.setOrderId(rs.getInt("Order_Id"));
+				o.setOrderDate(rs.getString("Order_Date"));
+				o.setTotalAmount(rs.getDouble("Total_Amount"));
+				o.setOrderStatus(rs.getString("Order_Status"));
+				list.add(o);
+			}
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return list;
+	}
+}
